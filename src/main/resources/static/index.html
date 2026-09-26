@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hotel Room Reservation</title>
+<style>
+  :root {
+    --bg:#f3f1ec; --panel:#fffdf8; --ink:#1d2a33; --muted:#6b7780; --line:#d9d4c8;
+    --free:#cfe6d5; --free-ink:#1f5b34; --busy:#c9c6bf; --busy-ink:#6d6a63;
+    --mine:#1f5fbf; --mine-ink:#fff; --accent:#1f5fbf;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#151a1e; --panel:#1e252b; --ink:#e8ecef; --muted:#93a0a9; --line:#333d45;
+      --free:#24462f; --free-ink:#a8dcb7; --busy:#3a4147; --busy-ink:#8a949b; --mine:#5b9bff; --mine-ink:#0b1a2e; --accent:#5b9bff; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 Georgia,"Times New Roman",serif; }
+  main { max-width:920px; margin:0 auto; padding:28px 16px 48px; }
+  h1 { font-size:1.9rem; margin:0 0 4px; letter-spacing:-.01em; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:end; background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:14px; }
+  label { display:flex; flex-direction:column; font-size:.9rem; color:var(--muted); gap:4px; }
+  input { width:90px; font:inherit; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+  button { font:inherit; padding:9px 14px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--ink); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:focus-visible, input:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+  #msg { margin:14px 0; min-height:1.5em; }
+  #msg.err { color:#b3261e; }
+  .stats { color:var(--muted); font-size:.9rem; display:flex; gap:16px; flex-wrap:wrap; margin-bottom:10px; }
+  .legend { display:flex; gap:14px; font-size:.85rem; color:var(--muted); margin:0 0 12px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+  .building { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; overflow-x:auto; }
+  .floor { display:flex; align-items:center; gap:6px; margin:6px 0; min-width:640px; }
+  .fl { width:34px; font-size:.8rem; color:var(--muted); text-align:right; }
+  .stairs { width:54px; height:44px; border:2px dashed var(--line); border-radius:6px; font-size:.7rem;
+    color:var(--muted); display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.1; }
+  .room { width:52px; height:44px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+    font-size:.85rem; font-variant-numeric:tabular-nums; }
+  .available { background:var(--free); color:var(--free-ink); }
+  .occupied  { background:var(--busy); color:var(--busy-ink); text-decoration:line-through; }
+  .booked    { background:var(--mine); color:var(--mine-ink); font-weight:700; }
+  .empty { width:52px; height:44px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hotel Room Reservation</h1>
+  <p class="sub">97 rooms, 10 floors. Stairs and lift are on the left.</p>
+
+  <div class="controls">
+    <label>Rooms needed (1–5)
+      <input id="count" type="number" min="1" max="5" value="2">
+    </label>
+    <button class="primary" id="bookBtn">Book rooms</button>
+    <button id="randomBtn">Generate random occupancy</button>
+    <button id="resetBtn">Reset all bookings</button>
+  </div>
+
+  <div id="msg" role="status" aria-live="polite"></div>
+  <div class="stats" id="stats"></div>
+  <div class="legend">
+    <span><i style="background:var(--free)"></i>Available</span>
+    <span><i style="background:var(--busy)"></i>Occupied</span>
+    <span><i style="background:var(--mine)"></i>Just booked</span>
+  </div>
+  <div class="building" id="building"></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function say(text, isError) {
+  const el = $('msg');
+  el.textContent = text;
+  el.className = isError ? 'err' : '';
+}
+
+async function api(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function render(state) {
+  $('stats').textContent = `${state.available} available, ${state.occupied} occupied`;
+  const b = $('building');
+  b.innerHTML = '';
+  state.floors.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'floor';
+    row.innerHTML = `<div class="fl">F${f.floor}</div><div class="stairs">Stairs / Lift</div>`;
+    f.rooms.forEach(r => {
+      const d = document.createElement('div');
+      d.className = 'room ' + r.status;
+      d.textContent = r.number;
+      d.title = `Room ${r.number}: ${r.status}`;
+      row.appendChild(d);
+    });
+    for (let i = f.rooms.length; i < 10; i++) {
+      const e = document.createElement('div');
+      e.className = 'empty';
+      row.appendChild(e);
+    }
+    b.appendChild(row);
+  });
+}
+
+async function refresh() { render(await api('GET', '/api/rooms')); }
+
+$('bookBtn').onclick = async () => {
+  try {
+    const result = await api('POST', '/api/book', { count: parseInt($('count').value, 10) });
+    await refresh();
+    say(`${result.message} Rooms: ${result.rooms.join(', ')}`);
+  } catch (e) { say(e.message, true); }
+};
+
+$('randomBtn').onclick = async () => {
+  try { render(await api('POST', '/api/random')); say('Random occupancy generated.'); }
+  catch (e) { say(e.message, true); }
+};
+
+$('resetBtn').onclick = async () => {
+  try { render(await api('POST', '/api/reset')); say('All bookings cleared.'); }
+  catch (e) { say(e.message, true); }
+};
+
+refresh().catch(e => say(e.message, true));
+</script>
+</body>
+</html>
