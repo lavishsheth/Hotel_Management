@@ -31,7 +31,7 @@ public class HotelService {
         return (pa - 1) + (pb - 1) + 2 * Math.abs(fa - fb);
     }
 
-    /** Longest travel time between any two rooms of the set (first-to-last room). */
+    // Longest travel time between any two rooms of the set.
     static int diameter(List<Integer> rooms) {
         int max = 0;
         for (int i = 0; i < rooms.size(); i++)
@@ -48,7 +48,7 @@ public class HotelService {
         return sum;
     }
 
-    /** Minutes from the stairs/lift on floor 1 to this room. */
+    // Minutes from the stairs/lift on floor 1 to this room.
     static int fromStairs(int room) {
         return (posOf(room) - 1) + 2 * (floorOf(room) - 1);
     }
@@ -57,15 +57,12 @@ public class HotelService {
         return rooms.stream().mapToInt(HotelService::fromStairs).sum();
     }
 
-    /**
-     * 1) max travel time between rooms, 2) total pairwise travel time,
-     * 3) closeness to the stairs/lift (so ties pick the nearest rooms, e.g. 101 for a single room).
-     */
+    //1) max travel time between rooms, 2) total pairwise travel time, 3) closeness to the stairs/lift (so ties pick the nearest rooms, e.g. 101 for a single room).
     static int cost(List<Integer> rooms) {
         return diameter(rooms) * 1_000_000 + sumOfPairs(rooms) * 1_000 + totalFromStairs(rooms);
     }
 
-    // ---------- Operations ----------
+    // Operations
     public synchronized BookingResult book(int count) {
         if (count < 1 || count > MAX_PER_BOOKING)
             throw new IllegalArgumentException("You can book between 1 and " + MAX_PER_BOOKING + " rooms at a time.");
