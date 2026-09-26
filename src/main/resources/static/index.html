@@ -71,6 +71,8 @@
 <script>
 const $ = id => document.getElementById(id);
 
+const API_URL = 'https://hotel-management-1-t0hz.onrender.com';
+
 function say(text, isError) {
   const el = $('msg');
   el.textContent = text;
@@ -78,13 +80,16 @@ function say(text, isError) {
 }
 
 async function api(method, url, body) {
-  const res = await fetch(url, {
+  const res = await fetch(API_URL + url, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined
   });
+
   const data = await res.json();
+
   if (!res.ok) throw new Error(data.error || 'Request failed');
+
   return data;
 }
 
@@ -92,10 +97,12 @@ function render(state) {
   $('stats').textContent = `${state.available} available, ${state.occupied} occupied`;
   const b = $('building');
   b.innerHTML = '';
+
   state.floors.forEach(f => {
     const row = document.createElement('div');
     row.className = 'floor';
     row.innerHTML = `<div class="fl">F${f.floor}</div><div class="stairs">Stairs / Lift</div>`;
+
     f.rooms.forEach(r => {
       const d = document.createElement('div');
       d.className = 'room ' + r.status;
@@ -103,33 +110,50 @@ function render(state) {
       d.title = `Room ${r.number}: ${r.status}`;
       row.appendChild(d);
     });
+
     for (let i = f.rooms.length; i < 10; i++) {
       const e = document.createElement('div');
       e.className = 'empty';
       row.appendChild(e);
     }
+
     b.appendChild(row);
   });
 }
 
-async function refresh() { render(await api('GET', '/api/rooms')); }
+async function refresh() {
+  render(await api('GET', '/api/rooms'));
+}
 
 $('bookBtn').onclick = async () => {
   try {
-    const result = await api('POST', '/api/book', { count: parseInt($('count').value, 10) });
+    const result = await api('POST', '/api/book', {
+      count: parseInt($('count').value, 10)
+    });
+
     await refresh();
     say(`${result.message} Rooms: ${result.rooms.join(', ')}`);
-  } catch (e) { say(e.message, true); }
+  } catch (e) {
+    say(e.message, true);
+  }
 };
 
 $('randomBtn').onclick = async () => {
-  try { render(await api('POST', '/api/random')); say('Random occupancy generated.'); }
-  catch (e) { say(e.message, true); }
+  try {
+    render(await api('POST', '/api/random'));
+    say('Random occupancy generated.');
+  } catch (e) {
+    say(e.message, true);
+  }
 };
 
 $('resetBtn').onclick = async () => {
-  try { render(await api('POST', '/api/reset')); say('All bookings cleared.'); }
-  catch (e) { say(e.message, true); }
+  try {
+    render(await api('POST', '/api/reset'));
+    say('All bookings cleared.');
+  } catch (e) {
+    say(e.message, true);
+  }
 };
 
 refresh().catch(e => say(e.message, true));
